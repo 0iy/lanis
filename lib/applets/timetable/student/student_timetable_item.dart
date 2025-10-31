@@ -267,7 +267,7 @@ class ItemBlock extends StatelessWidget {
                       ],
                     ),
                   ),
-                  if (isSelectionMode && subject != null && subject!.id != null)
+                  if (isSelectionMode && subject != null && subject!.id != null && !subject!.id!.startsWith('custom'))
                     Positioned(
                       top: 4,
                       right: 4,
@@ -303,9 +303,9 @@ class ItemBlock extends StatelessWidget {
           : GestureDetector(
               onTap: subject != null && subject!.id != null
                   ? () {
-                      if (isSelectionMode) {
+                      if (isSelectionMode && !subject!.id!.startsWith('custom')) {
                         onLessonTap?.call(subject!.id!);
-                      } else {
+                      } else if (!isSelectionMode) {
                         showSubject(context);
                       }
                     }
