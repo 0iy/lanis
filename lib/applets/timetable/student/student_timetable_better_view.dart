@@ -40,6 +40,8 @@ class _StudentTimetableBetterViewState
   }
 
   int currentWeekIndex = -1;
+  bool isSelectionMode = false;
+  Set<String> selectedLessonIds = {};
 
   @override
   Widget build(BuildContext context) {
@@ -97,45 +99,91 @@ class _StudentTimetableBetterViewState
 
           return Scaffold(
               appBar: AppBar(
-                title: Text(timeTableDefinition.label(context)),
-                leading: widget.openDrawerCb != null
+                title: Text(isSelectionMode 
+                    ? '${selectedLessonIds.length} ${AppLocalizations.of(context).selected}'
+                    : timeTableDefinition.label(context)),
+                leading: isSelectionMode
                     ? IconButton(
-                        icon: const Icon(Icons.menu),
-                        onPressed: () => widget.openDrawerCb!(),
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          setState(() {
+                            isSelectionMode = false;
+                            selectedLessonIds.clear();
+                          });
+                        },
                       )
-                    : null,
-                actions: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                    child: Row(
-                      children: [
-                        if (uniqueBadges.isNotEmpty &&
-                            timetable.weekBadge != null)
-                          TextButton(
+                    : (widget.openDrawerCb != null
+                        ? IconButton(
+                            icon: const Icon(Icons.menu),
+                            onPressed: () => widget.openDrawerCb!(),
+                          )
+                        : null),
+                actions: isSelectionMode
+                    ? [
+                        if (selectedLessonIds.isNotEmpty)
+                          IconButton(
+                            icon: const Icon(Icons.visibility_off),
+                            tooltip: AppLocalizations.of(context).hide,
                             onPressed: () {
-                              currentWeekIndex = (currentWeekIndex + 1) %
-                                  (uniqueBadges.length + 1);
-                              updateSettings('student-selected-week',
-                                  currentWeekIndex == 0);
+                              updateSettings('hidden-lessons', [
+                                ...?settings['hidden-lessons'],
+                                ...selectedLessonIds
+                              ]);
+                              setState(() {
+                                isSelectionMode = false;
+                                selectedLessonIds.clear();
+                              });
                             },
-                            child: Text(
-                              (currentWeekIndex < 1)
-                                  ? AppLocalizations.of(context)
-                                      .timetableAllWeeks
-                                  : AppLocalizations.of(context).timetableWeek(
-                                      uniqueBadges[currentWeekIndex - 1]),
-                            ),
                           ),
-                        IconButton(
-                            onPressed: () => updateSettings('single-day',
-                                !(settings['single-day'] ?? false)),
-                            icon: (settings['single-day'] ?? false)
-                                ? Icon(Icons.calendar_today)
-                                : Icon(Icons.calendar_today_outlined)),
+                        if (selectedLessonIds.isNotEmpty)
+                          IconButton(
+                            icon: const Icon(Icons.select_all),
+                            tooltip: AppLocalizations.of(context).selectAll,
+                            onPressed: () {
+                              setState(() {
+                                selectedLessonIds = selectedPlan
+                                    .expand((day) => day)
+                                    .where((subject) => 
+                                        subject.id != null && 
+                                        !subject.id!.startsWith('custom'))
+                                    .map((subject) => subject.id!)
+                                    .toSet();
+                              });
+                            },
+                          ),
+                      ]
+                    : [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Row(
+                            children: [
+                              if (uniqueBadges.isNotEmpty &&
+                                  timetable.weekBadge != null)
+                                TextButton(
+                                  onPressed: () {
+                                    currentWeekIndex = (currentWeekIndex + 1) %
+                                        (uniqueBadges.length + 1);
+                                    updateSettings('student-selected-week',
+                                        currentWeekIndex == 0);
+                                  },
+                                  child: Text(
+                                    (currentWeekIndex < 1)
+                                        ? AppLocalizations.of(context)
+                                            .timetableAllWeeks
+                                        : AppLocalizations.of(context).timetableWeek(
+                                            uniqueBadges[currentWeekIndex - 1]),
+                                  ),
+                                ),
+                              IconButton(
+                                  onPressed: () => updateSettings('single-day',
+                                      !(settings['single-day'] ?? false)),
+                                  icon: (settings['single-day'] ?? false)
+                                      ? Icon(Icons.calendar_today)
+                                      : Icon(Icons.calendar_today_outlined)),
+                            ],
+                          ),
+                        )
                       ],
-                    ),
-                  )
-                ],
               ),
               body: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4.0),
@@ -145,6 +193,28 @@ class _StudentTimetableBetterViewState
                   settings: settings,
                   updateSettings: updateSettings,
                   refresh: refresh,
+                  isSelectionMode: isSelectionMode,
+                  selectedLessonIds: selectedLessonIds,
+                  onLessonLongPress: (String lessonId) {
+                    setState(() {
+                      isSelectionMode = true;
+                      selectedLessonIds.add(lessonId);
+                    });
+                  },
+                  onLessonTap: (String lessonId) {
+                    if (isSelectionMode) {
+                      setState(() {
+                        if (selectedLessonIds.contains(lessonId)) {
+                          selectedLessonIds.remove(lessonId);
+                          if (selectedLessonIds.isEmpty) {
+                            isSelectionMode = false;
+                          }
+                        } else {
+                          selectedLessonIds.add(lessonId);
+                        }
+                      });
+                    }
+                  },
                 ),
               ),
               floatingActionButton: timetable.planForOwn != null
@@ -182,6 +252,10 @@ class TimeTableView extends StatelessWidget {
   final Map<String, dynamic> settings;
   final Function updateSettings;
   final Future<void> Function()? refresh;
+  final bool isSelectionMode;
+  final Set<String> selectedLessonIds;
+  final Function(String) onLessonLongPress;
+  final Function(String) onLessonTap;
 
   double calculateColumnHeight(List<TimeTableRow> rows) {
     double totalHeight = 0;
@@ -218,7 +292,11 @@ class TimeTableView extends StatelessWidget {
       required this.timetable,
       required this.settings,
       required this.updateSettings,
-      this.refresh});
+      this.refresh,
+      required this.isSelectionMode,
+      required this.selectedLessonIds,
+      required this.onLessonLongPress,
+      required this.onLessonTap});
 
   @override
   Widget build(BuildContext context) {
@@ -414,6 +492,10 @@ class TimeTableView extends StatelessWidget {
                           width: constraints.maxWidth,
                           settings: settings,
                           updateSettings: updateSettings,
+                          isSelectionMode: isSelectionMode,
+                          selectedLessonIds: selectedLessonIds,
+                          onLessonLongPress: onLessonLongPress,
+                          onLessonTap: onLessonTap,
                         ),
                     ],
                   );

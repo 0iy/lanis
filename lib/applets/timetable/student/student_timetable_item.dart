@@ -22,6 +22,11 @@ class ItemBlock extends StatelessWidget {
 
   final Map<String, dynamic> settings;
   final Function updateSettings;
+  
+  final bool isSelectionMode;
+  final bool isSelected;
+  final Function(String)? onLessonLongPress;
+  final Function(String)? onLessonTap;
 
   const ItemBlock({
     super.key,
@@ -36,6 +41,10 @@ class ItemBlock extends StatelessWidget {
     required this.settings,
     required this.updateSettings,
     this.disableAction = false,
+    this.isSelectionMode = false,
+    this.isSelected = false,
+    this.onLessonLongPress,
+    this.onLessonTap,
   });
 
   void showColorPicker(BuildContext context, Map<String, dynamic> settings,
@@ -195,7 +204,10 @@ class ItemBlock extends StatelessWidget {
       clipBehavior: Clip.hardEdge, // Clips any overflow, useful for the y axis
       decoration: BoxDecoration(
         border: Border.all(
-            color: color ?? Colors.transparent, width: min(1, width / 3)),
+            color: isSelected 
+                ? Colors.blue 
+                : (color ?? Colors.transparent), 
+            width: isSelected ? 3 : min(1, width / 3)),
         color: color ?? Colors.transparent,
         borderRadius: BorderRadius.circular(8.0),
       ),
@@ -218,51 +230,94 @@ class ItemBlock extends StatelessWidget {
     double calcWidth =
         max(1, width - ((width > (hOffset ?? 0)) ? (hOffset ?? 0) : 0));
 
+    Widget contentWidget = onlyColor
+        ? SizedBox()
+        : (!onlyColor && subject != null)
+            ? Stack(
+                children: [
+                  SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Wrap(
+                          runAlignment: WrapAlignment.spaceBetween,
+                          alignment: WrapAlignment.spaceBetween,
+                          spacing:
+                              height % itemHeight >= 1.99 ? 99999 : 8.0,
+                          children: [
+                            Text(
+                              subject!.name ?? '',
+                              style: textStyle,
+                              maxLines: 1,
+                            ),
+                            if (subject!.lehrer != null)
+                              Text(
+                                subject!.lehrer!,
+                                style: textStyle,
+                                maxLines: 1,
+                              ),
+                          ],
+                        ),
+                        if (subject!.raum != null)
+                          Text(
+                            subject!.raum!,
+                            style: textStyle,
+                            maxLines: 1,
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (isSelectionMode && subject != null && subject!.id != null)
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          color: isSelected ? Colors.blue : Colors.white.withOpacity(0.8),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.blue,
+                            width: 2,
+                          ),
+                        ),
+                        child: isSelected
+                            ? Icon(
+                                Icons.check,
+                                size: 14,
+                                color: Colors.white,
+                              )
+                            : null,
+                      ),
+                    ),
+                ],
+              )
+            : SizedBox();
+
     return Positioned(
       top: offset,
       left: hOffset,
       child: disableAction
           ? _colorContainer(calcWidth, child: SizedBox())
-          : InkWell(
-              onTap: subject != null ? () => showSubject(context) : null,
+          : GestureDetector(
+              onTap: subject != null && subject!.id != null
+                  ? () {
+                      if (isSelectionMode) {
+                        onLessonTap?.call(subject!.id!);
+                      } else {
+                        showSubject(context);
+                      }
+                    }
+                  : null,
+              onLongPress: subject != null && 
+                             subject!.id != null && 
+                             !subject!.id!.startsWith('custom')
+                  ? () => onLessonLongPress?.call(subject!.id!)
+                  : null,
               child: _colorContainer(
                 calcWidth,
-                child: onlyColor
-                    ? SizedBox()
-                    : (!onlyColor && subject != null)
-                        ? SingleChildScrollView(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Wrap(
-                                  runAlignment: WrapAlignment.spaceBetween,
-                                  alignment: WrapAlignment.spaceBetween,
-                                  spacing:
-                                      height % itemHeight >= 1.99 ? 99999 : 8.0,
-                                  children: [
-                                    Text(
-                                      subject!.name ?? '',
-                                      style: textStyle,
-                                      maxLines: 1,
-                                    ),
-                                    if (subject!.lehrer != null)
-                                      Text(
-                                        subject!.lehrer!,
-                                        style: textStyle,
-                                        maxLines: 1,
-                                      ),
-                                  ],
-                                ),
-                                if (subject!.raum != null)
-                                  Text(
-                                    subject!.raum!,
-                                    style: textStyle,
-                                    maxLines: 1,
-                                  ),
-                              ],
-                            ),
-                          )
-                        : SizedBox(),
+                child: contentWidget,
               ),
             ),
     );
@@ -292,6 +347,10 @@ class ListItem extends StatelessWidget {
   final double width;
   final Map<String, dynamic> settings;
   final Function updateSettings;
+  final bool isSelectionMode;
+  final Set<String> selectedLessonIds;
+  final Function(String) onLessonLongPress;
+  final Function(String) onLessonTap;
 
   const ListItem({
     super.key,
@@ -303,6 +362,10 @@ class ListItem extends StatelessWidget {
     required this.width,
     required this.settings,
     required this.updateSettings,
+    required this.isSelectionMode,
+    required this.selectedLessonIds,
+    required this.onLessonLongPress,
+    required this.onLessonTap,
   });
 
   @override
@@ -422,6 +485,10 @@ class ListItem extends StatelessWidget {
                     !(settings['single-day'] ?? false),
                 disableAction: subjectsInRow.length > 6 &&
                     !(settings['single-day'] ?? false),
+                isSelectionMode: isSelectionMode,
+                isSelected: subject.id != null && selectedLessonIds.contains(subject.id!),
+                onLessonLongPress: onLessonLongPress,
+                onLessonTap: onLessonTap,
               );
             }),
         ],

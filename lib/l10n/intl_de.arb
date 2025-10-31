@@ -354,6 +354,8 @@
   "addAccount": "Account hinzufügen",
   "lastSeen": "{days, plural, =0{Heute} one{Gestern} other{{days} Tage her}}",
   "student": "Schüler",
-  "parent": "Elternteil"
-
+  "parent": "Elternteil",
+  "selected": "ausgewählt",
+  "selectAll": "Alle auswählen",
+  "hide": "Ausblenden"
 }
